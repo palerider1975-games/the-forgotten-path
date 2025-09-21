@@ -1,0 +1,1260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Forgotten Path</title>
+<style>
+  :root{ --paper:#f4e4c1; --ink:#2b2a27; --ok:#16a34a; --bad:#ef4444; --gold:#b8860b; }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto;background:var(--paper);color:var(--ink);}
+  header{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.7);backdrop-filter:blur(8px);border-bottom:1px solid #0001}
+  .bar{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px}
+  .chips{display:flex;gap:10px;flex-wrap:wrap}
+  .chip{background:#fff;border:1px solid #0002;border-radius:999px;padding:6px 10px;font-size:.85rem}
+  main{padding:14px;display:grid;gap:14px;}
+
+  .game-area {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .side-panel {
+    background: #fff8;
+    border: 2px solid #0003;
+    border-radius: 14px;
+    padding: 14px;
+    text-align: center;
+    position: sticky;
+    top: 80px; /* Approx header height */
+  }
+  .side-panel h3 {
+      margin-top: 0;
+  }
+  #btnNextLevel {
+      width: 100%;
+      font-size: 1rem;
+  }
+
+  /* Card Map Styling */
+  .map-container {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px;
+    padding: 14px;
+    background: #fff8;
+    border: 2px solid #0003;
+    border-radius: 14px;
+    box-shadow:inset 0 0 0 2px #00000010, 0 10px 30px #00000025;
+  }
+  .card {
+    background-color: transparent;
+    aspect-ratio: 3 / 4;
+    perspective: 1000px;
+    cursor: pointer;
+    border-radius: 12px;
+  }
+  .card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    transition: transform 0.7s;
+    transform-style: preserve-3d;
+    border-radius: 12px;
+  }
+  .card.is-flipped .card-inner {
+    transform: rotateY(180deg);
+  }
+  .card-front,
+  .card-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    -webkit-backface-visibility: hidden; /* Safari */
+    backface-visibility: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    padding: 10px;
+    font-size: clamp(0.8rem, 2.5vw, 1.1rem);
+    font-weight: 700;
+  }
+  .card-front {
+    background-color: #b8c5d6;
+    border: 2px solid #334155;
+    color: #334155;
+  }
+  .card-back {
+    background-color: #10b981;
+    border: 2px solid #064e3b;
+    color: #fff;
+    transform: rotateY(180deg);
+  }
+  .card.is-dead .card-front {
+    background-color: #ef4444;
+    border-color: #7f1d1d;
+    color: #3b0a0a;
+    text-decoration: line-through;
+  }
+
+  .log{background:#fff;border:1px solid #0002;border-radius:12px;padding:10px;max-height:32svh;overflow:auto}
+  .entry{font-size:.95rem;margin:6px 0}
+  
+  button{border:0;border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer; transition: opacity .15s, background-color .15s, border-color .15s;}
+  button:active { opacity: .7; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .ok{background:var(--ok);color:#fff}
+  .bad{background:var(--bad);color:#fff}
+  .ghost{background:#1f263a;color:#e5e7eb}
+
+  /* Custom modal overlay */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:9999; backdrop-filter: blur(4px);}
+  .overlay.open{display:flex;}
+  .modal{background:#fff;border-radius:12px;max-width:min(680px,92vw);width:100%;padding:14px;box-shadow:0 20px 50px rgba(0,0,0,.4)}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;gap:10px; margin-bottom: 4px;}
+  .modal-head h3 { margin: 0; }
+  .choices{display:grid;gap:8px;margin-top:8px}
+  .choices button.is-hinted-good {
+    background-color: #dcfce7; /* Tailwind green-100 */
+    border: 2px solid var(--ok);
+    color: #166534; /* Tailwind green-800 */
+  }
+  .warn{display:none;margin:8px 0 0 0;padding:8px;border-radius:8px;background:#ffe8e6;color:#7a1b1b;border:1px solid #ef4444;font-size:.9rem}
+  .x{background:transparent;color:#1f263a;font-size:20px;line-height:1;padding:0 6px;border-radius:8px}
+
+  /* Result Modal styles */
+    .resultlist {
+    list-style: none;
+    padding: 0;
+    margin: .8rem 0 0 0;
+    font-size: .9rem;
+  }
+  .resultlist li {
+      background: #f0fdf4; /* very light green */
+      border-left: 3px solid var(--ok);
+      padding: 6px 10px;
+      margin-bottom: 5px;
+      border-radius: 0 4px 4px 0;
+  }
+  .resultlist li.bad {
+      background: #fee2e2; /* Tailwind red-100 */
+      border-left-color: #b91c1c; /* Tailwind red-800 */
+      color: #991b1b; /* Tailwind red-900 */
+      font-weight: 700;
+  }
+
+  /* Inventory styles */
+  .inv-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .inv-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .inv-item img {
+    width: 40px;
+    height: 40px;
+    border: 2px solid #0002;
+    border-radius: 8px;
+    background: #f7f7f7;
+    padding: 4px;
+    object-fit: contain;
+  }
+  .inv-item-name {
+    font-size: 0.75rem;
+    margin-top: 4px;
+    font-weight: 500;
+  }
+
+  /* Dungeon Styles */
+  #overlayDungeon .modal {
+    max-width: 95vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+  }
+  #dungeonWrap {
+      overflow: auto;
+      flex-grow: 1;
+      background: #2b2a27;
+      border-radius: 8px;
+      padding: 10px;
+      border: 2px solid #0003;
+  }
+  #dungeonGrid {
+      display: grid;
+      gap: 2px;
+  }
+  .tile {
+      aspect-ratio: 1 / 1;
+      background-color: #4a4844;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      border-radius: 2px;
+      transition: background-color .2s;
+  }
+  .tile-floor {
+      background-color: #7a766f;
+      cursor: pointer;
+  }
+   .tile-floor:hover {
+      background-color: #8b877f;
+   }
+  .tile-player {
+      background-color: #3b82f6 !important;
+      color: white;
+  }
+  .tile-exit {
+      background-color: #16a34a;
+  }
+  .tile-monster {
+      background-color: #ef4444;
+  }
+  .tile-treasure {
+      background-color: #f59e0b;
+  }
+  .tile-fog {
+      background-color: #333;
+      pointer-events: none;
+  }
+  #dungeonStatus {
+      padding: 8px 0;
+      font-size: .9rem;
+      font-weight: 500;
+  }
+
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <strong>The Forgotten Path</strong>
+    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+      <div class="chips">
+        <span class="chip">HP: <b id="hp">10/10</b></span>
+        <span class="chip">Player Level: <b id="playerLevel">1</b></span>
+        <span class="chip">Player XP: <b id="playerXp">0</b>/10</span>
+        <span class="chip">Gold: <b id="gold">0</b> ◆</span>
+        <span class="chip">Gear: <b id="gearCount">0</b></span>
+      </div>
+      <div class="chips">
+        <span class="chip">Region Level: <b id="regionLevel">1</b></span>
+        <span class="chip">Cleared: <b id="clearedCount">0</b>/10</span>
+      </div>
+    </div>
+  </div>
+  <div class="bar" style="gap:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="ok" id="btnNew">New Game</button>
+      <button class="ghost" id="btnInv">Inventory</button>
+      <button class="bad" id="btnReset">Reset</button>
+    </div>
+  </div>
+</header>
+
+<main>
+    <div class="game-area">
+        <div id="map" class="map-container"></div>
+        <div class="side-panel">
+            <h3>Progression</h3>
+            <p style="font-size: 0.9rem; margin: 10px 0;">Explorez au moins 8 régions pour débloquer le niveau suivant.</p>
+            <button id="btnNextLevel" class="ok" disabled>Niveau Suivant</button>
+        </div>
+    </div>
+    <section class="log" id="log"></section>
+</main>
+
+<!-- Event Modal -->
+<div id="overlay" class="overlay" aria-hidden="true">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="dlgTitle">Event</h3>
+    </div>
+    <p id="dlgText" style="margin:.4rem 0 .5rem 0"></p>
+    <div id="dlgMsg" class="warn"></div>
+    <div id="dlgChoices" class="choices"></div>
+  </div>
+</div>
+
+<!-- Inventory Modal -->
+<div id="overlayInv" class="overlay" aria-hidden="true">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Inventory</h3>
+      <button class="x" id="btnCloseInv" title="Close">✕</button>
+    </div>
+    <div id="invList" style="font-size:.95rem;line-height:1.4em"></div>
+  </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div id="overlayConfirm" class="overlay" aria-hidden="true">
+    <div class="modal">
+        <p id="confirmText" style="margin:.4rem 0 1rem 0; font-weight: 500;"></p>
+        <div style="display:flex; justify-content:flex-end; gap: 8px;">
+            <button id="btnConfirmNo" class="ghost">Cancel</button>
+            <button id="btnConfirmYes" class="ok">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- Result Modal -->
+<div id="overlayResult" class="overlay" aria-hidden="true">
+  <div class="modal">
+    <h3 id="resultTitle" style="margin-top:0">Outcome</h3>
+    <p id="resultText"></p>
+    <ul id="resultList" class="resultlist"></ul>
+    <div style="text-align:right; margin-top:1rem;">
+      <button id="btnResultContinue" class="ok">Continue</button>
+    </div>
+  </div>
+</div>
+
+<!-- Dungeon Modal -->
+<div id="overlayDungeon" class="overlay" aria-hidden="true">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="dungeonTitle">Dungeon</h3>
+      <button class="x" id="btnCloseDungeon" title="Close">✕</button>
+    </div>
+    <div id="dungeonStatus">Find the exit!</div>
+    <div id="dungeonWrap">
+        <div id="dungeonGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Combat Modal -->
+<div id="overlayCombat" class="overlay" aria-hidden="true">
+  <div class="modal">
+    <h3 id="combatTitle" style="margin-top:0">Encounter!</h3>
+    <p id="combatText"></p>
+    <div id="combatRolls" style="display:flex; justify-content:space-around; margin: 1rem 0; font-weight: bold; text-align: center;"></div>
+    <div style="text-align:center;">
+      <button id="btnCombatAction" class="bad">Attack!</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  const $ = s=>document.querySelector(s);
+  // --- DOM Elements ---
+  const map = $('#map'), log = $('#log');
+  const overlay=$('#overlay'), titleEl=$('#dlgTitle'), textEl=$('#dlgText'), msgEl=$('#dlgMsg'), choicesEl=$('#dlgChoices');
+  const overlayInv=$('#overlayInv'), invList=$('#invList');
+  const overlayConfirm=$('#overlayConfirm'), confirmTextEl=$('#confirmText'), btnConfirmYes=$('#btnConfirmYes'), btnConfirmNo=$('#btnConfirmNo');
+  const overlayResult=$('#overlayResult'), resultTitleEl=$('#resultTitle'), resultTextEl=$('#resultText'), resultListEl=$('#resultList'), btnResultContinue=$('#btnResultContinue');
+  const overlayDungeon=$('#overlayDungeon'), dungeonTitleEl=$('#dungeonTitle'), dungeonGridEl=$('#dungeonGrid'), dungeonStatusEl=$('#dungeonStatus');
+  const overlayCombat=$('#overlayCombat'), combatTitleEl=$('#combatTitle'), combatTextEl=$('#combatText'), combatRollsEl=$('#combatRolls'), btnCombatAction=$('#btnCombatAction');
+  const hpEl=$('#hp'), clearedCountEl=$('#clearedCount'), goldEl=$('#gold'), regionLevelEl=$('#regionLevel'), playerLevelEl=$('#playerLevel'), playerXpEl=$('#playerXp'), gearCountEl=$('#gearCount');
+  const btnNextLevel = $('#btnNextLevel');
+  
+  // --- Constants ---
+  const SAVE_KEY="regions_blobs_tiered_v22_narrative_fix";
+  const WEAPONS=["Iron Sword","Steel Dagger","Hunter Bow"];
+  const DEFENSIVE_GEAR = ["Wooden Shield", "Traveler Cloak", "Herbal Kit"];
+  const DUNGEON_MONSTERS = [
+    { name: "Giant Rat", emoji: "🐀" },
+    { name: "Goblin Scout", emoji: "👺" },
+    { name: "Skeleton Warrior", emoji: "💀" },
+    { name: "Cave Spider", emoji: "🕷️" },
+  ];
+  const GEAR_POOL=["Iron Sword","Wooden Shield","Hunter Bow","Traveler Cloak","Rope","Torch","Lucky Charm","Steel Dagger","Herbal Kit","Ring of Sparks"];
+  const REGION_NAMES=["Frostpine Vale","Elderglen","Blackrock Wastes","Sunspire Coast","Mistfen Marsh","Ivory Highlands","Stormreach Flats","Cinderwood","Starfall Plains","Grimwater"];
+  const ITEM_IMAGES = {
+    "Iron Sword": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M21.707 2.293a1 1 0 0 0-1.414 0l-7.293 7.293L11.586 8.172a1 1 0 0 0-1.414 1.414l1.414 1.414-2.475 2.475-3.536-3.536a3.515 3.515 0 0 0-4.95 0 3.515 3.515 0 0 0 0 4.95l7.071 7.071a3.515 3.515 0 0 0 4.95 0 3.515 3.515 0 0 0 0-4.95l-3.536-3.536 2.475-2.475 1.414 1.414a1 1 0 0 0 1.414-1.414l-1.414-1.414 7.293-7.293a1 1 0 0 0 0-1.414Z'/%3E%3C/svg%3E",
+    "Steel Dagger": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M19.293 4.707a1 1 0 0 0-1.414-1.414l-7.586 7.586-1.414-1.414a1 1 0 1 0-1.414 1.414l1.414 1.414-4.243 4.243a3.515 3.515 0 0 0 0 4.95 3.515 3.515 0 0 0 4.95 0l4.243-4.243 1.414 1.414a1 1 0 0 0 1.414-1.414l-1.414-1.414Z'/%3E%3C/svg%3E",
+    "Hunter Bow": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 21l-6-6m0 0l-1.5-1.5M15 15l-1.5-1.5m-3.5-3.5L10 10m-2 2l-6 6'/%3E%3Cpath d='M21 3l-6 6'/%3E%3Cpath d='M3 3l6 6'/%3E%3Cpath d='M15 3l-2.001 2.001A5.003 5.003 0 0 0 7.999 13L3 18'/%3E%3Cpath d='M3 9l2.001-2.001A5.003 5.003 0 0 1 13 2.001L18 7'/%3E%3C/svg%3E",
+    "Wooden Shield": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2a10 10 0 0 0-9.8 11.516A10.005 10.005 0 0 0 12 22a10.005 10.005 0 0 0 9.8-8.484A10 10 0 0 0 12 2Zm-1 4h2v5h-2V6Zm0 6h2v5h-2v-5Z'/%3E%3C/svg%3E",
+    "Traveler Cloak": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2a1 1 0 0 0-1 1v1H8a1 1 0 0 0 0 2h3v1a4 4 0 0 0-4 4v3a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-3a4 4 0 0 0-4-4v-1h3a1 1 0 1 0 0-2h-3V3a1 1 0 0 0-1-1Z'/%3E%3C/svg%3E",
+    "Rope": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12a8 8 0 0 1 8-8 8 8 0 0 1 8 8v8a4 4 0 0 1-4 4h-8a4 4 0 0 1-4-4v-8Zm4-4a4 4 0 0 0-4 4v8h12v-8a4 4 0 0 0-4-4h-4Z'/%3E%3C/svg%3E",
+    "Torch": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M14.467 2.112a1 1 0 0 0-1.127.355l-7.5 11A1 1 0 0 0 6.5 15H10v6a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-6h3.5a1 1 0 0 0 .86-.467l-7.5-11a1 1 0 0 0-1.393-.32Z'/%3E%3C/svg%3E",
+    "Lucky Charm": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2a1 1 0 0 0-1 1v1.362A8.986 8.986 0 0 0 4.362 11H3a1 1 0 1 0 0 2h1.362a8.986 8.986 0 0 0 6.638 6.638V21a1 1 0 1 0 2 0v-1.362a8.986 8.986 0 0 0 6.638-6.638H21a1 1 0 1 0 0-2h-1.362a8.986 8.986 0 0 0-6.638-6.638V3a1 1 0 0 0-1-1Zm0 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12Z'/%3E%3C/svg%3E",
+    "Herbal Kit": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2a1 1 0 0 0-1 1v1H8a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-3V3a1 1 0 0 0-1-1Zm-3 5h6v2h-6V7Zm0 4h6v2h-6v-2Zm0 4h6v2h-6v-2Z'/%3E%3C/svg%3E",
+    "Ring of Sparks": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-1 5a1 1 0 0 1 2 0v2.414l1.293-1.293a1 1 0 1 1 1.414 1.414L13.414 11H16a1 1 0 1 1 0 2h-2.586l2.293 2.293a1 1 0 0 1-1.414 1.414L12 14.414V17a1 1 0 1 1-2 0v-2.586l-2.293 2.293a1 1 0 0 1-1.414-1.414L8.586 13H6a1 1 0 1 1 0-2h2.586l-2.293-2.293a1 1 0 0 1 1.414-1.414L10 9.586V7Z'/%3E%3C/svg%3E"
+  };
+  const EVENTS = [
+    { level:1, type: 'dungeon', title:"La Crypte Abandonnée", description:"Une porte en pierre fissurée, à moitié recouverte de lierre, mène vers le bas dans l'obscurité. L'air qui s'en échappe est froid et sent la terre ancienne.", requiredItems: ["Torch", "Rope"]},
+    { level:1, title:"Marchand Ambulant", description:"Vous croisez un marchand ambulant dont la charrette est remplie de marchandises diverses. Il vous salue d'un signe de tête amical, espérant faire une vente.", choices:["Acheter (15 or)","Discuter","Voler","Ignorer"] },
+    { level:1, title:"Voyageur Perdu", description:"Un voyageur fatigué vous demande son chemin vers la ville la plus proche. Il a l'air inoffensif et simplement désorienté.", choices:["Aider","Mentir","Exiger un paiement","Ignorer"] },
+    { level:1, title:"Ruine Paisible", description:"Vous découvrez les ruines silencieuses d'une ancienne tour de guet. Il n'y a aucun signe de monstre, juste le vent qui siffle à travers les pierres.", choices:["Fouiller","Se reposer","Gratter votre nom","Partir"] },
+    { level:2, title:"Musicien Itinérant", description:"Le son joyeux d'un luth vous parvient. Vous trouvez un barde assis sur un rocher, composant une nouvelle chanson. Il vous fait un clin d'œil en vous voyant approcher.", choices:["Donner une pièce","Demander une chanson","Chanter avec lui","Partir en silence"] },
+    { level:2, title:"Animal Étrange", description:"Un écureuil avec une fourrure d'un violet éclatant jacasse sur une branche au-dessus de vous. Il laisse tomber une noix brillante à vos pieds.", choices:["Prendre la noix","Lui parler","Lancer une pierre","Ignorer"] },
+    { level:2, title:"Rivière Obstinée", description:"Une rivière rapide et large bloque votre chemin. Il n'y a pas de pont en vue, mais un grand arbre abattu pourrait faire l'affaire un peu plus loin.", choices:["Traverser à la nage","Utiliser une Corde","Chercher un gué","Faire demi-tour"] },
+
+    { 
+        level:1, 
+        title:"Abandoned Camp", 
+        description:"You stumble upon an abandoned camp...", 
+        choices:[
+            {
+                label: "Search tents", best: true,
+                followUp: {
+                    description: "Inside the largest tent, you find a weathered map lying on a bedroll next to a small, locked wooden chest.",
+                    choices: [
+                        {label: "Take the map", best: true}, 
+                        {label: "Try to open the chest"}
+                    ]
+                }
+            },
+            {label: "Take food"},
+            {label: "Rest"},
+            {label: "Leave"}
+        ] 
+    },
+    { 
+        level:1, 
+        title:"Fairy Ring", 
+        description:"In a quiet clearing, a perfect circle of mushrooms emits a soft, ethereal glow...", 
+        choices:[
+            {
+                label: "Dance", best: true,
+                followUp: {
+                    description: "As you dance, the lights intensify... A shimmering, ethereal figure coalesces in the center...",
+                    choices: [
+                        {label: "Ask for a blessing", best: true}, 
+                        {label: "Ask for riches"}
+                    ]
+                }
+            },
+            {label: "Pluck a mushroom"},
+            {label: "Ask for boon"},
+            {label: "Wait"}
+        ] 
+    },
+    { 
+        level:1, 
+        title:"Rusty Shrine", 
+        description:"Hidden by moss and time, you find a tiny, forgotten shrine...", 
+        choices:[
+            {
+                label: "Pray", best: true,
+                followUp: {
+                    description: "You kneel and offer a silent prayer... You feel as though an offering would be appreciated.",
+                    choices: [
+                        {label: "Offer 10 Gold", best: true}, 
+                        {label: "Offer a simple blessing", best: true}
+                    ]
+                }
+            },
+            {label: "Search offering bowl"},
+            {label: "Clean altar"},
+            {label: "Kick it over"}
+        ] 
+    },
+
+    { level:1, title:"Goblin Ambush", description:"Rustling leaves turn into a sudden threat...", choices:[{label:"Fight", best:true},{label:"Run"},{label:"Hide"},{label:"Offer food"}], monster: { name: "Goblins", emoji: "👺" }},
+    { level:1, title:"Merchant Caravan", description:"A colorful merchant caravan trundles along the path...", choices:[{label:"Trade (20 Gold)", best: true},{label:"Discuter"},{label:"Gamble"},{label:"Ignore"}] },
+    { level:2, title:"Cursed Ruins", description:"Ancient stone arches, choked with thorny vines, loom before you...", choices:[{label:"Read runes"},{label:"Leave offering"},{label:"Break a seal"},{label:"Explore tunnels", best: true}] },
+    { level:2, title:"Haunted Bridge", description:"A rickety wooden bridge spans a deep, foggy chasm...", choices:[{label:"Cross slowly"},{label:"Sprint"},{label:"Repair planks", best:true},{label:"Shout a name"}] },
+    { level:2, title:"Witch’s Hut", description:"Deep in the woods, a crooked hut with a smoking chimney stands alone...", choices:[{label:"Knock", best:true},{label:"Peek inside"},{label:"Drink potion"},{label:"Set a snare"}] },
+    { level:3, title:"Bandit King’s Bargain", description:"You are brought before the Bandit King...", choices:[{label:"Fight"},{label:"Pay"},{label:"Join", best:true},{label:"Sneak away"}], monster: { name: "Bandit King", emoji: "👑" } },
+  ];
+  const OUTCOME_TEXTS = {
+    SUCCESS: ["Your quick thinking pays off.", "A fortunate outcome! Your skills prove sufficient.", "Success! The situation is resolved in your favor.", "Well done. You handle the challenge with ease."],
+    FIGHT_SUCCESS: ["Your martial prowess wins the day. The enemy is defeated.", "A fierce battle, but you emerge victorious.", "With steel and courage, you overcome the threat."],
+    DEATH: ["Your wounds are too severe. Your journey ends here.", "You were overwhelmed. Darkness takes you.", "You have succumbed to your injuries.", "Your adventure concludes as your life force fades."]
+  };
+  
+  // --- Game State ---
+  let state = { regionLevel:1, playerLevel: 1, playerXp: 0, cleared:0, gold:0, gear:[], regions:[], activeDungeon: null, currentRegionId: null, hp: 10, maxHp: 10, hintedRegions: [] };
+
+  // ---------- Helpers ----------
+  function rand(n){ return Math.floor(Math.random()*n); }
+  function choice(a){ return a[rand(a.length)]; }
+  function shuffle(a) {
+      for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+  }
+  function save(){ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
+  function load(){
+      const s = localStorage.getItem(SAVE_KEY);
+      if(s){
+          const v=JSON.parse(s);
+          state.regionLevel=v.regionLevel||1;
+          state.playerLevel = v.playerLevel || 1;
+          state.playerXp = v.playerXp || 0;
+          state.cleared=v.cleared||0;
+          state.gold=v.gold||0;
+          state.hp = v.hp !== undefined ? v.hp : 10;
+          state.maxHp = v.maxHp !== undefined ? v.maxHp : 10;
+          state.gear=Array.isArray(v.gear)?v.gear:[];
+          state.regions=Array.isArray(v.regions)?v.regions:[];
+          state.activeDungeon = v.activeDungeon || null;
+          state.hintedRegions = v.hintedRegions || [];
+      }
+  }
+  function updateStats(){ 
+      hpEl.textContent=`${state.hp}/${state.maxHp}`;
+      hpEl.parentElement.style.color = state.hp <= state.maxHp / 4 ? 'var(--bad)' : 'var(--ink)';
+      clearedCountEl.textContent=`${state.cleared}/10`; 
+      goldEl.textContent=state.gold; 
+      gearCountEl.textContent=state.gear.length; 
+      regionLevelEl.textContent=state.regionLevel; 
+      playerLevelEl.textContent = state.playerLevel;
+      playerXpEl.textContent = `${state.playerXp}/10`;
+  }
+  function addLog(t){ const e=document.createElement('div'); e.className='entry'; e.innerHTML=t; log.prepend(e); }
+  function hasItem(name){ return state.gear.includes(name); }
+  function hasWeapon(){ return state.gear.some(g => WEAPONS.includes(g)); }
+  function showReq(msg){ msgEl.textContent = msg; msgEl.style.display='block'; setTimeout(()=>msgEl.style.display='none',1500); }
+  function reqFor(label){
+    const L = label.toLowerCase();
+    if(L === 'fight') return { weapon:true };
+    if(L.includes('rope')) return { item:'Rope' };
+    if(L.includes('torch')) return { item:'Torch' };
+    if(L === 'pay' || L.startsWith('pay ') || L.includes('(15 or)') || L === 'offer 10 gold' || L === 'trade (20 gold)') return { gold: 20 };
+    return {};
+  }
+   function takeDamage(amount) {
+      state.hp = Math.max(0, state.hp - amount);
+      updateStats();
+      return state.hp <= 0; // Return true if dead
+  }
+  function heal(amount) {
+      state.hp = Math.min(state.maxHp, state.hp + amount);
+      updateStats();
+  }
+  function generateRequirementsHtml(items) {
+      if (!items || items.length === 0) return '';
+      const listItems = items.map(item => {
+          const has = hasItem(item);
+          const icon = has ? `<span style="color:var(--ok);">✔</span>` : `<span style="color:var(--bad);">❌</span>`;
+          return `<li style="list-style:none; margin-bottom:4px; font-weight: 500;">${icon} ${item}</li>`;
+      }).join('');
+      return `<ul style="padding:0; margin:0;">${listItems}</ul>`;
+  }
+
+  // ---------- Map Generation ----------
+  function genMap(){
+    const mapContainer = $('#map');
+    mapContainer.innerHTML = '';
+    
+    for(let id=0; id < 10; id++){
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.dataset.id = id;
+
+        const cardInner = document.createElement('div');
+        cardInner.className = 'card-inner';
+
+        const cardFront = document.createElement('div');
+        cardFront.className = 'card-front';
+        cardFront.textContent = REGION_NAMES[id % REGION_NAMES.length];
+
+        const cardBack = document.createElement('div');
+        cardBack.className = 'card-back';
+        cardBack.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span style="font-size: 0.8rem; margin-top: 4px;">Complété</span>
+        `;
+
+        cardInner.appendChild(cardFront);
+        cardInner.appendChild(cardBack);
+        card.appendChild(cardInner);
+
+        card.addEventListener('click',()=>openEvent(id));
+        mapContainer.appendChild(card);
+    }
+  }
+
+  function renderClasses(){
+    const cards = document.querySelectorAll('#map .card');
+    cards.forEach((cardNode, i) => {
+      const region = state.regions[i];
+      if(!region) return;
+      cardNode.classList.toggle('is-flipped', !!region.cleared);
+      cardNode.classList.toggle('is-dead', !!region.dead);
+      
+      if (region.cleared || region.dead) {
+          cardNode.style.pointerEvents = 'none';
+      } else {
+          cardNode.style.pointerEvents = 'auto';
+      }
+    });
+  }
+
+  // ---------- Modals ----------
+  function openModal(title, text, choices, onChoice, options = {}){
+    titleEl.textContent=title;
+    textEl.innerHTML = text;
+    msgEl.style.display='none'; choicesEl.innerHTML='';
+    choices.forEach(choice => {
+        const b = document.createElement('button');
+        const label = typeof choice === 'string' ? choice : choice.label;
+        b.textContent = label;
+        b.className = 'ghost';
+        
+        const choiceObject = choices.find(c => (typeof c === 'string' ? c : c.label) === label);
+        if (options.isHinted && choiceObject && typeof choiceObject === 'object' && choiceObject.best) {
+            b.classList.add('is-hinted-good');
+        }
+
+        if (typeof choice === 'object' && choice.disabled) {
+            b.disabled = true;
+            b.title = "Vous n'avez pas tous les objets requis.";
+        }
+
+        b.onclick = () => onChoice(label);
+        choicesEl.appendChild(b);
+    });
+    overlay.classList.add('open'); overlay.setAttribute('aria-hidden','false');
+  }
+  function closeModal(){ overlay.classList.remove('open'); overlay.setAttribute('aria-hidden','true'); }
+
+  function openInv(){
+    let html = `<div style="margin-bottom: 8px;"><b>Gold:</b> ${state.gold} ◆ | <b>Player Level:</b> ${state.playerLevel}</div>`;
+    html += state.gear.length ? `<div class="inv-grid">${state.gear.map(g => `<div class="inv-item" title="${g}"><img src="${ITEM_IMAGES[g] || ''}" alt="${g}"><span class="inv-item-name">${g}</span></div>`).join('')}</div>` : '<p>Your inventory is empty.</p>';
+    invList.innerHTML=html;
+    overlayInv.classList.add('open'); overlayInv.setAttribute('aria-hidden','false');
+  }
+  function closeInv(){ overlayInv.classList.remove('open'); overlayInv.setAttribute('aria-hidden','true'); }
+  $('#btnCloseInv').addEventListener('click', closeInv);
+  overlayInv.addEventListener('click', (e)=>{ if(e.target===overlayInv) closeInv(); });
+  
+  function showConfirm(text, onYes, onNo) {
+      confirmTextEl.textContent = text;
+      overlayConfirm.classList.add('open');
+      btnConfirmYes.onclick = () => {
+          overlayConfirm.classList.remove('open');
+          if (onYes) onYes();
+      };
+      btnConfirmNo.onclick = () => {
+          overlayConfirm.classList.remove('open');
+          if (onNo) onNo();
+      };
+  }
+  overlayConfirm.addEventListener('click', (e) => { if (e.target === overlayConfirm) overlayConfirm.classList.remove('open'); });
+
+  function showResultModal(title, text, results, onContinueCallback) {
+      closeModal();
+      resultTitleEl.textContent = title;
+      resultTextEl.innerHTML = text; 
+      resultListEl.innerHTML = '';
+      if (results) {
+        results.forEach(res => {
+            const li = document.createElement('li');
+            li.innerHTML = res.text;
+            if(res.type === 'bad') li.className = 'bad';
+            resultListEl.appendChild(li);
+        });
+      }
+      overlayResult.classList.add('open');
+      btnResultContinue.onclick = () => {
+          overlayResult.classList.remove('open');
+          if (onContinueCallback) {
+              onContinueCallback();
+          } else {
+              renderClasses();
+              checkLevelCompletion();
+              if (!checkPlayerLevelUp()) {
+                 save();
+              }
+          }
+      };
+  }
+  
+  // ---------- Dungeon & Combat Logic ----------
+  function generateDungeon(width, height, level) {
+      let map = Array(height).fill(null).map(() => Array(width).fill('W'));
+      let playerPos = { x: 0, y: 0 };
+      let floorTiles = [];
+      let monsters = {};
+
+      function carve(x, y) {
+          map[y][x] = 'F';
+          floorTiles.push({x, y});
+          const dirs = shuffle([{x:0,y:-2},{x:0,y:2},{x:-2,y:0},{x:2,y:0}]);
+          for(const dir of dirs) {
+              const nx = x + dir.x, ny = y + dir.y;
+              if (nx > 0 && nx < width-1 && ny > 0 && ny < height-1 && map[ny][nx] === 'W') {
+                  map[y + dir.y/2][x + dir.x/2] = 'F';
+                  carve(nx, ny);
+              }
+          }
+      }
+      const startX = 1, startY = 1;
+      carve(startX, startY);
+      playerPos = {x: startX, y: startY};
+      
+      let placed = 0;
+      const validTiles = shuffle(floorTiles.filter(t => t.x !== startX || t.y !== startY));
+      
+      for(const tile of validTiles) {
+          if (placed >= 4 + level * 2) break;
+          if (placed === 0) {
+              map[tile.y][tile.x] = 'E'; // Exit
+          } else if (placed % 2 === 1) { // Monster
+              map[tile.y][tile.x] = 'M';
+              monsters[`${tile.x},${tile.y}`] = choice(DUNGEON_MONSTERS);
+          } else { // Treasure
+              map[tile.y][tile.x] = 'T';
+          }
+          placed++;
+      }
+      return { map, playerPos, monsters };
+  }
+
+  function renderDungeon() {
+      if (!state.activeDungeon) return;
+      const { map, playerPos } = state.activeDungeon;
+      dungeonGridEl.innerHTML = '';
+      dungeonGridEl.style.gridTemplateColumns = `repeat(${map[0].length}, 1fr)`;
+
+      for (let y = 0; y < map.length; y++) {
+          for (let x = 0; x < map[y].length; x++) {
+              const tile = document.createElement('div');
+              tile.className = 'tile';
+              let type = map[y][x];
+              
+              switch(type) {
+                  case 'F': tile.classList.add('tile-floor'); break;
+                  case 'E': tile.classList.add('tile-exit'); tile.textContent = '🚪'; break;
+                  case 'M': tile.classList.add('tile-monster'); tile.textContent = state.activeDungeon.monsters[`${x},${y}`]?.emoji || '💀'; break;
+                  case 'T': tile.classList.add('tile-treasure'); tile.textContent = '💰'; break;
+              }
+
+              if (x === playerPos.x && y === playerPos.y) {
+                  tile.classList.add('tile-player');
+                  tile.textContent = '🙂';
+              }
+              if(map[y][x] !== 'W') tile.onclick = () => movePlayer(x, y);
+              
+              dungeonGridEl.appendChild(tile);
+          }
+      }
+  }
+
+  function movePlayer(targetX, targetY) {
+      if (!state.activeDungeon) return;
+      const { playerPos, map } = state.activeDungeon;
+      const dx = Math.abs(playerPos.x - targetX);
+      const dy = Math.abs(playerPos.y - targetY);
+      
+      if (map[targetY][targetX] !== 'W' && ((dx === 1 && dy === 0) || (dx === 0 && dy === 1))) {
+          const targetTileType = map[targetY][targetX];
+
+          switch(targetTileType) {
+              case 'M':
+                  startCombat(targetX, targetY);
+                  return; 
+              case 'T':
+                  const goldFound = 50 + rand(50 * state.regionLevel);
+                  state.gold += goldFound;
+                  updateStats();
+                  addLog(`Vous avez trouvé un trésor ! +${goldFound} or.`);
+                  
+                  state.activeDungeon.playerPos.x = targetX;
+                  state.activeDungeon.playerPos.y = targetY;
+                  state.activeDungeon.map[targetY][targetX] = 'F';
+
+                  showResultModal(
+                      "Treasure Found!", 
+                      "You open a chest and find a pile of gold.", 
+                      [{ text: `+${goldFound} Gold`, type: 'good' }],
+                      () => {
+                          renderDungeon();
+                          save();
+                      }
+                  );
+                  return;
+              case 'E':
+                  addLog("Vous avez trouvé la sortie du donjon !");
+                  const region = state.regions[state.currentRegionId];
+                  region.cleared = true;
+                  state.playerXp += 2;
+                  
+                  updateStats();
+                  closeDungeon();
+
+                  const onContinue = () => {
+                      renderClasses();
+                      checkLevelCompletion();
+                      if (!checkPlayerLevelUp()) {
+                          save();
+                      }
+                  };
+                  
+                  showResultModal(
+                      "Donjon terminé !", 
+                      "Vous avez exploré les profondeurs et trouvé la sortie.", 
+                      [{ text: `Région explorée !`, type: 'good' }, { text: `+2 Player XP`, type: 'good' }],
+                      onContinue
+                  );
+                  return;
+          }
+          
+          playerPos.x = targetX;
+          playerPos.y = targetY;
+          renderDungeon();
+      }
+  }
+
+  function startDungeon(ev, regionId) {
+      closeModal();
+      state.currentRegionId = regionId;
+      dungeonTitleEl.textContent = ev.title;
+      const dungeon = generateDungeon(15, 11, state.regionLevel);
+      state.activeDungeon = dungeon;
+      renderDungeon();
+      overlayDungeon.classList.add('open');
+  }
+
+  function closeDungeon() {
+      state.activeDungeon = null;
+      overlayDungeon.classList.remove('open');
+  }
+  $('#btnCloseDungeon').addEventListener('click', closeDungeon);
+
+  function startCombat(monsterX, monsterY) {
+    const monster = state.activeDungeon.monsters[`${monsterX},${monsterY}`];
+    if (!monster) return;
+
+    combatTitleEl.textContent = `Encounter: ${monster.name} ${monster.emoji}`;
+    combatTextEl.textContent = `A wild ${monster.name} blocks your path!`;
+    combatRollsEl.innerHTML = '';
+    btnCombatAction.textContent = "Attack!";
+    btnCombatAction.disabled = false;
+
+    overlayDungeon.classList.remove('open');
+    overlayCombat.classList.add('open');
+
+    btnCombatAction.onclick = () => resolveCombat(monster, monsterX, monsterY);
+  }
+
+  function resolveCombat(monster, monsterX, monsterY) {
+    btnCombatAction.disabled = true;
+
+    const playerAttackBonus = state.gear.filter(g => WEAPONS.includes(g)).length;
+    const playerRoll = rand(6) + 1 + playerAttackBonus + (state.playerLevel - 1);
+    const monsterRoll = rand(6) + 1;
+    
+    const bonusText = `(+${playerAttackBonus + (state.playerLevel - 1)})`;
+    combatRollsEl.innerHTML = `<div>Player Roll ${bonusText}: <br><span style="font-size: 1.8em">${playerRoll}</span></div><div>${monster.name} Roll: <br><span style="font-size: 1.8em">${monsterRoll}</span></div>`;
+
+    if (playerRoll >= monsterRoll) {
+        addLog(`⚔️ You defeated a ${monster.name} in the dungeon.`);
+        state.activeDungeon.map[monsterY][monsterX] = 'F';
+        delete state.activeDungeon.monsters[`${monsterX},${monsterY}`];
+        state.activeDungeon.playerPos.x = monsterX;
+        state.activeDungeon.playerPos.y = monsterY;
+        overlayCombat.classList.remove('open');
+
+        showResultModal(
+            "Victory!",
+            `You defeated the ${monster.name}!`,
+            [{ text: 'Enemy vanquished', type: 'good' }],
+            () => {
+                overlayDungeon.classList.add('open');
+                renderDungeon();
+                save();
+            }
+        );
+    } else {
+        const defenseBonus = state.gear.filter(g => DEFENSIVE_GEAR.includes(g)).length;
+        const damageRoll = rand(6) + 1;
+        const damageTaken = Math.max(0, damageRoll - defenseBonus);
+        
+        combatTextEl.innerHTML = `Your attack fails! The ${monster.name} strikes back, dealing <b>${damageTaken}</b> damage.`;
+        addLog(`🩸 Failed attack, took ${damageTaken} damage from a ${monster.name}.`);
+        const isPlayerDead = takeDamage(damageTaken);
+
+        btnCombatAction.textContent = "Continue";
+        btnCombatAction.disabled = false;
+        btnCombatAction.onclick = () => {
+            overlayCombat.classList.remove('open');
+            if (!isPlayerDead) {
+                overlayDungeon.classList.add('open');
+                renderDungeon();
+            } else {
+                closeDungeon();
+                gameOver();
+            }
+        };
+    }
+  }
+
+    function startOverworldCombat(event, regionId) {
+        closeModal();
+        const monster = event.monster;
+
+        combatTitleEl.textContent = `Combat: ${monster.name} ${monster.emoji}`;
+        combatTextEl.textContent = `You face the ${monster.name} in battle!`;
+        combatRollsEl.innerHTML = '';
+        btnCombatAction.textContent = "Attack!";
+        btnCombatAction.disabled = false;
+
+        overlayCombat.classList.add('open');
+        btnCombatAction.onclick = () => resolveOverworldCombat(event, regionId);
+    }
+
+    function resolveOverworldCombat(event, regionId) {
+        btnCombatAction.disabled = true;
+        const region = state.regions[regionId];
+        const monster = event.monster;
+
+        const playerAttackBonus = state.gear.filter(g => WEAPONS.includes(g)).length;
+        const playerRoll = rand(6) + 1 + playerAttackBonus + (state.playerLevel - 1);
+        const monsterRoll = rand(6) + 1 + Math.floor(state.regionLevel / 2);
+
+        const bonusText = `(+${playerAttackBonus + (state.playerLevel - 1)})`;
+        combatRollsEl.innerHTML = `<div>Player Roll ${bonusText}: <br><span style="font-size: 1.8em">${playerRoll}</span></div><div>${monster.name} Roll: <br><span style="font-size: 1.8em">${monsterRoll}</span></div>`;
+
+        setTimeout(() => { 
+            overlayCombat.classList.remove('open');
+            if (playerRoll >= monsterRoll) {
+                const results = [];
+                const outcomeText = choice(OUTCOME_TEXTS.FIGHT_SUCCESS);
+                const reward = 15 + state.regionLevel * 5 + rand(10 * state.regionLevel);
+                state.gold += reward;
+                results.push({ text: `+${reward} Gold`, type: 'good' });
+
+                if (Math.random() < (0.5 + state.regionLevel * 0.05)) {
+                    const itemPool = GEAR_POOL.filter(g => !state.gear.includes(g));
+                    if (itemPool.length) {
+                        const newItem = choice(itemPool);
+                        state.gear.push(newItem);
+                        results.push({ text: `Found: <b>${newItem}</b>`, type: 'good' });
+                    }
+                }
+                region.cleared = true;
+                state.playerXp++;
+                results.push({ text: `+1 Player XP`, type: 'good' });
+                addLog(`✅ Won combat at region ${regionId + 1}: ${event.title}.`);
+                updateStats();
+                showResultModal("Victory!", outcomeText, results);
+            } else {
+                const results = [];
+                const defenseBonus = state.gear.filter(g => DEFENSIVE_GEAR.includes(g)).length;
+                const damageRoll = rand(6) + 1 + state.regionLevel;
+                const damageTaken = Math.max(1, damageRoll - defenseBonus);
+                
+                addLog(`💥 Took ${damageTaken} damage fighting ${monster.name}.`);
+                results.push({ text: `-${damageTaken} HP`, type: 'bad' });
+                
+                const isPlayerDead = takeDamage(damageTaken);
+                if (isPlayerDead) {
+                    region.dead = true;
+                    results.push({ text: '☠️ You were defeated in combat.', type: 'bad' });
+                    showResultModal("Defeated", "You have fallen in battle.", results, () => gameOver());
+                } else {
+                    region.cleared = true; 
+                    state.playerXp++;
+                    results.push({ text: `+1 Player XP`, type: 'good' });
+                    updateStats();
+                    showResultModal("Wounded", "You were defeated, but managed to escape.", results);
+                }
+            }
+        }, 1000); 
+    }
+
+    function resolveOutcome(label, ev, i, deadlyChoiceLabel) {
+        const region = state.regions[i];
+        const req = reqFor(label);
+
+        if (req.weapon && !hasWeapon()) { showReq("You need a weapon to fight."); return; }
+        if (req.item && !hasItem(req.item)) { showReq("You need the item: " + req.item); return; }
+        if (typeof req.gold === 'number' && state.gold < req.gold) { showReq(`Not enough gold (${req.gold} required).`); return; }
+        
+        let results = [];
+        let outcomeText = "";
+        let isSuccess = true;
+
+        if (typeof req.gold === 'number') { state.gold -= req.gold; addLog(`– Paid ${req.gold} gold.`); }
+
+        if (label.toLowerCase() === 'fight' && ev.monster) { startOverworldCombat(ev, i); return; }
+
+        switch (ev.title) {
+            case "Abandoned Camp":
+                if (label === "Take the map") {
+                    const unclearedDungeon = state.regions.map((r, idx) => ({...r, idx})).find(r => !r.cleared && !r.dead && r.event.type === 'dungeon');
+                    if (unclearedDungeon) {
+                        state.hintedRegions.push(unclearedDungeon.idx);
+                        const hintedRegionName = REGION_NAMES[unclearedDungeon.idx % REGION_NAMES.length];
+                        outcomeText = `The map marks a point of interest in the <b>${hintedRegionName}</b> region. It looks like an old crypt.`;
+                        results.push({ text: 'Dungeon location revealed!', type: 'good' });
+                    } else {
+                        outcomeText = "The map is old and faded, revealing nothing of value.";
+                    }
+                } else if (label === "Try to open the chest") {
+                    if (rand(2) === 0) {
+                        const itemPool = GEAR_POOL.filter(g => !state.gear.includes(g));
+                        if (itemPool.length) {
+                            const newItem = choice(itemPool);
+                            state.gear.push(newItem);
+                            outcomeText = "The lock clicks open! You find a useful item inside.";
+                            results.push({ text: `Found: <b>${newItem}</b>`, type: 'good' });
+                        } else {
+                            outcomeText = "The chest is empty.";
+                        }
+                    } else {
+                        const damage = 5 * state.regionLevel;
+                        isSuccess = false;
+                        if (takeDamage(damage)) { region.dead = true; }
+                        outcomeText = "The chest was trapped!";
+                        results.push({ text: `-${damage} HP`, type: 'bad' });
+                    }
+                } else if (label === "Take food" || label === "Rest") {
+                    const healed = (label === "Take food" ? 1 : 2) + state.regionLevel;
+                    heal(healed);
+                    outcomeText = label === "Take food" ? "You eat the food and feel better." : "You rest by the warm embers.";
+                    results.push({ text: `+${healed} HP`, type: 'good' });
+                }
+                break;
+            case "Rusty Shrine":
+                 if (label === "Offer 10 Gold") {
+                    const cost = 10;
+                    if (state.gold < cost) { showReq(`Not enough gold (${cost} required).`); return; }
+                    state.gold -= cost;
+                    const healed = 5 + state.playerLevel;
+                    heal(healed);
+                    outcomeText = "As you place the coins in the bowl, a warm light envelops you. The gods are pleased.";
+                    results.push({ text: `-${cost} Gold`, type: 'bad' });
+                    results.push({ text: `+${healed} HP`, type: 'good' });
+                } else if (label === "Offer a simple blessing") {
+                    outcomeText = "You take a moment to meditate at the shrine, offering your thoughts. A sense of peace washes over you.";
+                }
+                break;
+            case "Merchant Caravan":
+                 if (label === "Trade (20 Gold)") {
+                    const cost = 20;
+                    const tradable = ["Rope", "Torch"].filter(item => !hasItem(item));
+                    if(tradable.length > 0) {
+                        const newItem = choice(tradable);
+                        state.gold -= cost;
+                        state.gear.push(newItem);
+                        outcomeText = `You trade ${cost} gold for a ${newItem}.`;
+                        results.push({ text: `- ${cost} Gold`, type: 'bad' }, { text: `Obtained: <b>${newItem}</b>`, type: 'good' });
+                    } else {
+                        outcomeText = "You already own the basic supplies the merchant is offering.";
+                    }
+                } else if (label === "Discuter") {
+                    const uncleared = state.regions.map((r, idx) => ({...r, idx})).filter(r => !r.cleared && !r.dead && r.idx !== i);
+                    if(uncleared.length > 0) {
+                         const hintedRegionIndex = choice(uncleared).idx;
+                         state.hintedRegions.push(hintedRegionIndex);
+                         const hintedRegionName = REGION_NAMES[hintedRegionIndex % REGION_NAMES.length];
+                         outcomeText = `The merchant whispers a rumor about the <b>${hintedRegionName}</b>.`;
+                         results.push({ text: `Hint obtained!`, type: 'good' });
+                    } else {
+                        outcomeText = "The merchant shares some road gossip, but nothing of consequence.";
+                    }
+                }
+                break;
+            case "Bandit King’s Bargain":
+                 if (label === "Join") {
+                    outcomeText = "You swear fealty to the Bandit King. He claps you on the shoulder, welcoming you to his crew. For now, you are one of them.";
+                    const reward = 25 * state.regionLevel;
+                    state.gold += reward;
+                    results.push({ text: `+${reward} Gold from the gang`, type: 'good' });
+                    if (!hasWeapon()) {
+                        state.gear.push("Steel Dagger");
+                        results.push({ text: `Given a <b>Steel Dagger</b>`, type: 'good' });
+                    }
+                }
+                break;
+            default:
+                if (label === deadlyChoiceLabel) {
+                    isSuccess = false;
+                    const damage = 3 + state.regionLevel * 2 + rand(5);
+                    if(takeDamage(damage)) { region.dead = true; }
+                    
+                    if (ev.title === "Goblin Ambush" && label === "Offer food") {
+                        outcomeText = "The desperate goblins weren't satisfied with a small offering. They swarmed you to take everything, injuring you in the process.";
+                    } else {
+                        outcomeText = "Your choice led to a dangerous outcome, but you persevered.";
+                    }
+                    results.push({ text: `-${damage} HP`, type: 'bad' });
+                    const rewardGold = 50;
+                    state.gold += rewardGold;
+                    results.push({ text: `+${rewardGold} Gold`, type: 'good' });
+                    if (!hasItem("Steel Dagger")) {
+                        state.gear.push("Steel Dagger");
+                        results.push({ text: `Found: <b>Steel Dagger</b>`, type: 'good' });
+                    }
+                } else {
+                    outcomeText = choice(OUTCOME_TEXTS.SUCCESS);
+                    if (!req.gold) {
+                        const reward = 10 + state.regionLevel * 5 + rand(10 * state.regionLevel);
+                        state.gold += reward;
+                        results.push({ text: `+${reward} Gold`, type: 'good' });
+                    }
+                    if (Math.random() < (0.45 + state.regionLevel * 0.05)) {
+                        const itemPool = GEAR_POOL.filter(g => !state.gear.includes(g));
+                        if (itemPool.length) {
+                            const newItem = choice(itemPool);
+                            state.gear.push(newItem);
+                            results.push({ text: `Found: <b>${newItem}</b>`, type: 'good' });
+                        }
+                    }
+                }
+                break;
+        }
+
+        region.cleared = true;
+        state.playerXp++;
+        results.push({ text: `+1 Player XP`, type: 'good' });
+
+        if (region.dead) {
+            results.push({ text: '☠️ You succumbed to your wounds.', type: 'bad' });
+            showResultModal("You Have Fallen", outcomeText, results, () => gameOver());
+        } else {
+            showResultModal(isSuccess ? "Success!" : "A Painful Lesson", outcomeText, results);
+        }
+    }
+
+    function openEvent(i) {
+        const region = state.regions[i];
+        if (!region || region.cleared || region.dead || state.hp <= 0) return;
+
+        const ev = region.event;
+        if (!ev) { console.error(`No event found for region ${i}`); return; }
+
+        if (ev.type === 'dungeon') {
+            const requirementsHtml = generateRequirementsHtml(ev.requiredItems);
+            const fullContent = ev.description + (requirementsHtml ? `<h4 style="margin:1rem 0 .5rem 0">Équipement Requis :</h4>${requirementsHtml}` : '');
+            const hasAllItems = ev.requiredItems ? ev.requiredItems.every(item => hasItem(item)) : true;
+            const modalChoices = [{ label: 'Entrer', disabled: !hasAllItems, best: true }, 'Partir'];
+            openModal(ev.title, fullContent, modalChoices, (choice) => {
+                if (choice === 'Entrer') startDungeon(ev, i); else closeModal();
+            }, { isHinted: state.hintedRegions.includes(i) });
+            return;
+        }
+
+        const isHinted = state.hintedRegions.includes(i);
+
+        function presentChoices(title, description, choices) {
+            const deadlyChoice = choice(choices.map(c => typeof c === 'string' ? c : c.label));
+            
+            openModal(title, description, choices, (chosenLabel) => {
+                const choiceObject = choices.find(c => (typeof c === 'string' ? c : c.label) === chosenLabel);
+                if (choiceObject && typeof choiceObject === 'object' && choiceObject.followUp) {
+                    presentChoices(title, choiceObject.followUp.description, choiceObject.followUp.choices);
+                } else {
+                    resolveOutcome(chosenLabel, ev, i, deadlyChoice);
+                }
+            }, { isHinted });
+        }
+        presentChoices(`${ev.title} (Region Level ${state.regionLevel})`, ev.description, ev.choices);
+    }
+
+    function checkPlayerLevelUp() {
+        if (state.playerXp >= 10) {
+            state.playerLevel++;
+            state.playerXp -= 10;
+            const hpGain = 10;
+            state.maxHp += hpGain;
+            heal(hpGain);
+            addLog(`<h2>🌟 LEVEL UP! You are now Player Level ${state.playerLevel}!</h2>`);
+            const results = [
+                { text: `Max HP increased to ${state.maxHp}!`, type: 'good' },
+                { text: `All dice rolls gain a permanent +1 bonus!`, type: 'good' }
+            ];
+            showResultModal(`Level Up! You reached Level ${state.playerLevel}!`, `You feel more experienced and powerful.`, results, () => {
+                updateStats();
+                save();
+            });
+            return true;
+        }
+        return false;
+    }
+
+  function gameOver(){
+    renderClasses();
+    addLog(`<h2>GAME OVER</h2>`);
+    showConfirm(choice(OUTCOME_TEXTS.DEATH) + " Restart this Region Level?",
+        () => startRegionLevel(state.regionLevel),
+        () => newGame()
+    );
+  }
+
+  function checkLevelCompletion() {
+    const clearedCount = state.regions.filter(r => r.cleared || r.dead).length;
+    state.cleared = clearedCount;
+    updateStats();
+
+    if (clearedCount >= 8) {
+        btnNextLevel.disabled = false;
+        addLog('✨ Vous avez exploré suffisamment de régions ! Passez au niveau suivant.');
+    } else {
+        btnNextLevel.disabled = true;
+    }
+  }
+
+  function startRegionLevel(levelNum){
+    state.regionLevel = levelNum;
+    state.cleared = 0;
+    state.hintedRegions = [];
+    state.maxHp = 10 + (state.playerLevel - 1) * 10;
+    state.hp = state.maxHp;
+    const levelEvents = EVENTS.filter(e => e.level === state.regionLevel);
+    const lowerLevelEvents = EVENTS.filter(e => e.level < state.regionLevel);
+    let eventPool = [...levelEvents];
+    shuffle(lowerLevelEvents);
+    while(eventPool.length < 10 && lowerLevelEvents.length > 0) {
+        eventPool.push(lowerLevelEvents.pop());
+    }
+    shuffle(eventPool);
+    const finalEvents = eventPool.slice(0, 10);
+    state.regions = Array(10).fill(0).map((_, i) => ({
+        cleared:false, 
+        dead:false,
+        event: finalEvents[i] || choice(EVENTS)
+    }));
+    genMap();
+    renderClasses();
+    updateStats();
+    checkLevelCompletion();
+    save();
+  }
+
+  function newGame(){
+    state = { regionLevel:1, playerLevel: 1, playerXp: 0, cleared:0, gold:0, gear:[], regions:[], activeDungeon: null, currentRegionId: null, hp: 10, maxHp: 10, hintedRegions: [] };
+    log.innerHTML = '';
+    addLog("🌟 New adventure begins!");
+    startRegionLevel(1);
+  }
+
+  // ---------- Buttons ----------
+  $('#btnNew').addEventListener('click', () => showConfirm('Start a new run? All progress will be lost.', newGame));
+  $('#btnReset').addEventListener('click', () => showConfirm('Delete all saves and restart from scratch?', () => { localStorage.removeItem(SAVE_KEY); newGame(); }));
+  $('#btnInv').addEventListener('click', openInv);
+  btnNextLevel.addEventListener('click', () => {
+    if (btnNextLevel.disabled) return;
+    addLog(`<h2>🗺️ En route pour le niveau de région ${state.regionLevel + 1} !</h2>`);
+    startRegionLevel(state.regionLevel + 1);
+  });
+
+
+  // ---------- Init ----------
+  load(); 
+  if (state.regions.length === 0 || !state.regions.find(r => r.event)) {
+      startRegionLevel(state.regionLevel);
+  } else {
+      genMap();
+      renderClasses();
+  }
+  updateStats();
+  checkLevelCompletion();
+  addLog("Welcome back, adventurer!");
+});
+</script>
+</body>
+</html>
+
